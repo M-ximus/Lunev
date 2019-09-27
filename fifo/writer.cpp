@@ -7,9 +7,18 @@
 #include <stdio.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <sys/stat.h>
 
 int main()
 {
+    errno = 0;
+    int ret_stat = mkfifo("fifo.p", 00600);
+    if (ret_stat < 0 && errno != EEXIST)
+    {
+        printf("mkfifo error - %d\n", errno);
+        exit(EXIT_FAILURE);
+    }
+
     errno = 0;
     int fifo_fd = open("fifo.p", O_RDONLY);
     if (fifo_fd < 0)

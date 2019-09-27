@@ -34,7 +34,7 @@ int main(int argc, char* argv[])
 
     errno = 0;
     int ret_stat = mkfifo("fifo.p", 00600);
-    if (ret_stat < 0)
+    if (ret_stat < 0 && errno != EEXIST)
     {
         printf("mkfifo error - %d\n", errno);
         exit(EXIT_FAILURE);
