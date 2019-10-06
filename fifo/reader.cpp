@@ -10,8 +10,9 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <assert.h>
+#include <string.h>
 
-
+char* fifo_name();
 ssize_t calcSize(const char* inFile);
 
 int main(int argc, char* argv[])
@@ -21,7 +22,7 @@ int main(int argc, char* argv[])
         printf("Error num_params\n");
         exit(EXIT_FAILURE);
     }
-
+/*
     errno = 0;
     int in_fd = open(argv[1], O_RDONLY);
     if (in_fd < 0)
@@ -30,21 +31,15 @@ int main(int argc, char* argv[])
         exit(EXIT_FAILURE);
     }
 
-    ssize_t file_size = calcSize(argv[1]);
+    ssize_t file_size = calcSize(argv[1]);*/
 
+    printf("%s\n", fifo_name());
+/*
     errno = 0;
     int ret_stat = mkfifo("fifo.p", 00600);
     if (ret_stat < 0 && errno != EEXIST)
     {
         printf("mkfifo error - %d\n", errno);
-        exit(EXIT_FAILURE);
-    }
-
-    errno = 0;
-    int fifo_fd = open("fifo.p", O_WRONLY);
-    if (fifo_fd < 0)
-    {
-        printf("Error of opening fifo = %d\n", errno);
         exit(EXIT_FAILURE);
     }
 
@@ -84,8 +79,27 @@ int main(int argc, char* argv[])
 
     close(fifo_fd);
     free(buff);
-
+*/
     return 0;
+}
+
+char* fifo_name()
+{
+  pid_t my_pid = getpid();
+
+  errno = 0;
+  char* pid_buff = (char*) calloc(17, sizeof(pid_buff[0]));//fifoi32.p\0
+  if (errno != 0)
+  {
+    printf("pid mem error = %d", errno);
+    exit(EXIT_FAILURE);
+  }
+
+  strcpy(pid_buff, "fifo");
+  sprintf((pid_buff + 4), "%d", my_pid);
+  strcat(pid_buff, ".p");
+
+  return pid_buff;
 }
 
 ssize_t calcSize(const char* inFile)
