@@ -28,7 +28,7 @@ int main(int argc, char* argv[])
     char* buff = read_file(argv[1], &file_size);
     assert(buff != nullptr);
     assert(file_size > 0);
-    
+
     errno = 0;
     int ret_stat = mkfifo("transfer.p", 00600);
     if (ret_stat < 0 && errno != EEXIST)
@@ -45,19 +45,20 @@ int main(int argc, char* argv[])
       exit(EXIT_FAILURE);
     }
 
-    char* fifo = {};
+    char* fifo = nullptr;
     while(true)
     {
       int writer_pid = 0;
       errno = 0;
       ssize_t ret_read = read(trans_fd, &writer_pid, sizeof(writer_pid));
-      if (ret_read < 0)
+      if (ret_read <= 0)
       {
         perror("Read pid from transfer error\n");
         exit(EXIT_FAILURE);
       }
 
       fifo = fifo_name(writer_pid);
+      printf("%s\n", fifo);
 
       errno = 0;
       int ret_fifo = mkfifo(fifo, 00600);
@@ -69,15 +70,12 @@ int main(int argc, char* argv[])
 
       errno = 0;
       int fifo_fd = open(fifo, O_WRONLY | O_NONBLOCK);
-      if (fifo_fd < 0)
+      if (fifo_fd < 0 && errno == EINTR)
       {
+        printf("%d\n", errno);
         perror("Named fifo can't be opened\n");
         exit(EXIT_FAILURE);
       }
-
-////////////////////////////////////////////////////////
-      sleep(5);
-////////////////////////////////////////////////////////
 
       errno = 0;
       int ret_fcntl = fcntl(fifo_fd, F_SETFL, ~O_NONBLOCK);//without '~'?
@@ -87,26 +85,27 @@ int main(int argc, char* argv[])
         exit(EXIT_FAILURE);
       }
 
-      errno = 0;
-      int ret_val = write(fifo_fd, &file_size, sizeof(file_size));
-      if (ret_val < 0)
+
+      int ret_val = -1;
+      for(int i = 0; i < 5; i++)
       {
-        if (errno == EPIPE)
+
+        ////////////////////////////////////////////////////////
+        sleep(5);
+        ////////////////////////////////////////////////////////
+
+        errno = 0;
+        ret_val = write(fifo_fd, &file_size, sizeof(file_size));
+        if (ret_val < 0)
         {
-          close(fifo_fd);
-
-          errno = 0;
-          int ret_rm = remove(fifo);
-          if (ret_rm < 0)
+          if (errno == EPIPE)
           {
-            perror("Remove error\n");
-            exit(EXIT_FAILURE);
+            close(fifo_fd);
+            continue;//TODO goto or while + continue
           }
-
-          continue;//TODO goto or while + continue
+          perror("Write to named pipe error(not connection)\n");
+          exit(EXIT_FAILURE);
         }
-        perror("Write to named pipe error(not connection)\n");
-        exit(EXIT_FAILURE);
       }
 
       errno = 0;
@@ -116,15 +115,6 @@ int main(int argc, char* argv[])
         if (errno == EPIPE)
         {
           close(fifo_fd);
-
-          errno = 0;
-          int ret_rm = remove(fifo);
-          if (ret_rm < 0)
-          {
-            perror("Remove error\n");
-            exit(EXIT_FAILURE);
-          }
-
           continue;
         }
         perror("Write to named pipe error(not connection)\n");
