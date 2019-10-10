@@ -45,9 +45,8 @@ int main(int argc, char* argv[])
       exit(EXIT_FAILURE);
     }
 
-    char* fifo = nullptr;
-
     int my_pid = getpid();
+    char* fifo = fifo_name(my_pid);
     errno = 0;
     ssize_t ret_read = write(trans_fd, &my_pid, sizeof(my_pid));
     if (ret_read <= 0)
@@ -56,7 +55,6 @@ int main(int argc, char* argv[])
       exit(EXIT_FAILURE);
     }
 
-    fifo = fifo_name(my_pid);
     printf("%s\n", fifo);
 
     int fifo_fd = -1;
@@ -67,12 +65,13 @@ int main(int argc, char* argv[])
       fifo_fd = open(fifo, O_WRONLY | O_NONBLOCK);
       if (fifo_fd < 0)
       {
-          if (errno == EINTR)
-            continue;
-          printf("%d\n", errno);
-          perror("Named fifo can't be opened\n");
-          exit(EXIT_FAILURE);
-        }
+        if (errno == EINTR)
+          continue;
+        printf("%d\n", errno);
+        perror("Named fifo can't be opened\n");
+        exit(EXIT_FAILURE);
+      }
+      break;
     }
 
     errno = 0;
