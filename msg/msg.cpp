@@ -32,7 +32,7 @@ int main(int argc, const char* argv[])
 
   errno = 0;
   int msg_id = msgget(IPC_PRIVATE, IPC_CREAT | 0666);
-  if (msg_id <= 0)
+  if (msg_id < 0)
   {
     perror("Creating msg queue error");
     printf("Error = %d", errno);
@@ -75,12 +75,16 @@ int main(int argc, const char* argv[])
       snd_msg(msg_id, i);//block or error can send
       //printf("Parent called %ld\n", i);
       //fflush(0);
-      wait(NULL);//dead lock;
+      rcv_msg(msg_id, num_child + 1);
+
+      //wait(NULL);//dead lock;
     }
   }else
   {
     rcv_msg(msg_id, name);
-    printf("%ld\n", name);
+    printf("%ld ", name);
+    fflush(0);
+    snd_msg(msg_id, num_child + 1);
     return 0;
   }
 
