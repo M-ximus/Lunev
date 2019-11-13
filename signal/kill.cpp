@@ -13,16 +13,18 @@ char cur_bit = 0;
 
 static void died_child(int sig)
 {
-    printf("%d\n", sig);
+    //printf("%d\n", sig);
     write(2, died_chld_msg, 23);
     exit(EXIT_FAILURE);
 }
 
 static void chld_alarm(int sig)
 {
-    printf("%d\n", sig);
-    int ppid = getppid();
-    if (ppid == 1)
+    //printf("%d\n", sig);
+    int old_ppid = getppid();
+    //int new_ppid = getppid();
+    //static ppid = getppid();
+    if (old_ppid == 1)
     {
         write(2, died_parent_msg, 27);
         exit(EXIT_FAILURE);
@@ -32,11 +34,13 @@ static void chld_alarm(int sig)
 
 static void handler_usr1(int sig)
 {
+    //perror("Parent caught 0\n");
     cur_bit = 0;
 }
 
 static void handler_usr2(int sig)
 {
+//    perror("Parent caught 1\n");
     cur_bit = 1;
 }
 
@@ -95,8 +99,10 @@ int main(int argc, char* argv[])
     {
         errno = 0;
         struct sigaction sa_child;
-        ret = sigemptyset(&sa_child.sa_mask);
-        if (ret < 0)
+        sigemptyset(&sa_child.sa_mask);
+        /*sigaddset(&sa_child.sa_mask, SIGUSR1);
+        sigaddset(&sa_child.sa_mask, SIGUSR2);*/
+        if (errno != 0)
         {
             perror("make parent sigchld empty mask error");
             exit(EXIT_FAILURE);
@@ -138,7 +144,7 @@ int main(int argc, char* argv[])
             perror("make parent usr2 empty mask error");
             exit(EXIT_FAILURE);
         }
-        sa_usr1.sa_handler = handler_usr2;
+        sa_usr2.sa_handler = handler_usr2;
 
         errno = 0;
         ret = sigaction(SIGUSR2, &sa_usr2, NULL);
@@ -187,17 +193,23 @@ int main(int argc, char* argv[])
             char cur_simb = 0;
             for(int i = 0; i < 8; ++i)
             {
-                printf("%d\n", i);
+                //printf("Curr parent bit %d\n", i);
                 char mask = 0x01 << i;
 
                 errno = 0;
-                sigsuspend(&start_set);
+                //printf("%d\n", run_mask);
+                fflush(0);
+                sigsuspend(&run_mask);
                 if (errno != EINTR)
                 {
                     perror("Not interrupt error in parent suspend");
                     exit(EXIT_FAILURE);
                 }
-                cur_simb = cur_simb | (mask & cur_bit);
+
+                if (cur_bit)
+                    cur_simb = cur_simb | mask;
+                else
+                    cur_simb = cur_simb & (~mask);
 
                 errno = 0;
                 ret = kill(pid, SIGALRM);
@@ -206,6 +218,7 @@ int main(int argc, char* argv[])
                     perror("Bad sigalarm to chld");
                     exit(EXIT_FAILURE);
                 }
+                //exit(0);
             }
             printf("%c", cur_simb);
         }
@@ -225,6 +238,8 @@ int main(int argc, char* argv[])
         sa_chld_alarm.sa_mask = mask_alarm;
         sa_chld_alarm.sa_flags = 0;
         sa_chld_alarm.sa_handler = chld_alarm;
+
+        ret = sigaction(SIGALRM, &sa_chld_alarm, NULL);
 
         sigset_t send_mask;
         ret = sigfillset(&send_mask);
@@ -270,7 +285,7 @@ int main(int argc, char* argv[])
             {
                 char mask = 0x01 << j;
                 errno = 0;
-                if (mask & cur_simb)
+                if ((mask & cur_simb) == 0)
                     ret = kill(ppid, SIGUSR1);
                 else
                     ret = kill(ppid, SIGUSR2);
@@ -280,7 +295,7 @@ int main(int argc, char* argv[])
                     exit(EXIT_FAILURE);
                 }
 
-                printf("Child send bit\n");
+                //printf("Child send bit\n");
 
                 Child_glob_check = 0;
                 while(Child_glob_check == 0)
@@ -293,11 +308,10 @@ int main(int argc, char* argv[])
                         perror("Not interrupt error in suspend");
                         exit(EXIT_FAILURE);
                     }
-                    printf("After child alarm\n");
+                    //printf("After child alarm\n");
                 }
             }
         } while(1);
     }
-
     return 0;
 }
