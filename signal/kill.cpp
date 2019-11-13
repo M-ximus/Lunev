@@ -8,8 +8,13 @@
 const char died_chld_msg[] = "Parent caught SIGCHLD\n";
 const char died_parent_msg[] = "Child caugnt parent death\n";
 
+const char zbit = '0';
+const char hbit = '1';
+
+int old_ppid = 0;
+
 int Child_glob_check = 1;
-char cur_bit = 0;
+volatile char cur_bit = 0;
 
 static void died_child(int sig)
 {
@@ -21,10 +26,11 @@ static void died_child(int sig)
 static void chld_alarm(int sig)
 {
     //printf("%d\n", sig);
-    int old_ppid = getppid();
+    //static int old_ppid = getppid();
+    int cur_ppid = getppid();
     //int new_ppid = getppid();
     //static ppid = getppid();
-    if (old_ppid == 1)
+    if (old_ppid != cur_ppid)
     {
         write(2, died_parent_msg, 27);
         exit(EXIT_FAILURE);
@@ -34,13 +40,13 @@ static void chld_alarm(int sig)
 
 static void handler_usr1(int sig)
 {
-    //perror("Parent caught 0\n");
+    write(2, &zbit, 1);
     cur_bit = 0;
 }
 
 static void handler_usr2(int sig)
 {
-//    perror("Parent caught 1\n");
+    write(2, &hbit, 1);
     cur_bit = 1;
 }
 
@@ -51,6 +57,8 @@ int main(int argc, char* argv[])
         printf("Bad num of arguments\n");
         exit(EXIT_FAILURE);
     }
+
+    old_ppid = getpid();
 
     errno = 0;
     sigset_t start_set;
@@ -145,6 +153,7 @@ int main(int argc, char* argv[])
             exit(EXIT_FAILURE);
         }
         sa_usr2.sa_handler = handler_usr2;
+        sa_usr2.sa_flags = SA_NODEFER;
 
         errno = 0;
         ret = sigaction(SIGUSR2, &sa_usr2, NULL);
@@ -198,7 +207,7 @@ int main(int argc, char* argv[])
 
                 errno = 0;
                 //printf("%d\n", run_mask);
-                fflush(0);
+                //fflush(0);
                 sigsuspend(&run_mask);
                 if (errno != EINTR)
                 {
