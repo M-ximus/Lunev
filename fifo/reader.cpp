@@ -13,8 +13,7 @@
 #include <string.h>
 
 char* fifo_name(int pid);
-ssize_t calcSize(const char* inFile);
-char* read_file(const char* name, ssize_t* file_size);
+//char* read_file(const char* name, ssize_t* file_size);
 
 int main(int argc, char* argv[])
 {
@@ -24,10 +23,22 @@ int main(int argc, char* argv[])
       exit(EXIT_FAILURE);
     }
 
-    ssize_t file_size = -1;
-    char* buff = read_file(argv[1], &file_size);
-    assert(buff != nullptr);
-    assert(file_size > 0);
+    errno = 0;
+    char* buff = (char*) calloc(4096, sizeof(buff[0]));
+    if (buff == NULL)
+    {
+        perror("Allocate buff error");
+        exit(EXIT_FAILURE);
+    }
+
+    errno = 0;
+    int file_fd = open(argv[1], O_RDONLY | O_NONBLOCK);
+    if (file_fd < 0)
+    {
+        perror("Open file error");
+        exit(EXIT_FAILURE);
+    }
+    //printf("I opened\n");
 
     errno = 0;
     int ret_stat = mkfifo("transfer.p", 00600);
@@ -45,85 +56,60 @@ int main(int argc, char* argv[])
       exit(EXIT_FAILURE);
     }
 
-    char* fifo = nullptr;
-    while(true)
+    //char* fifo = nullptr;
+
+    int writer_pid = 0;
+    errno = 0;
+    ssize_t ret_read = read(trans_fd, &writer_pid, sizeof(writer_pid));
+    if (ret_read <= 0)
     {
-      int writer_pid = 0;
-      errno = 0;
-      ssize_t ret_read = read(trans_fd, &writer_pid, sizeof(writer_pid));
-      if (ret_read <= 0)
-      {
-        perror("Read pid from transfer error\n");
-        exit(EXIT_FAILURE);
-      }
+      perror("Read pid from transfer error\n");
+      exit(EXIT_FAILURE);
+    }
 
-      fifo = fifo_name(writer_pid);
-      printf("%s\n", fifo);
+    fifo = fifo_name(writer_pid);
+    //printf("%s\n", fifo);
 
-      errno = 0;
-      int ret_fifo = mkfifo(fifo, 00600);
-      if (ret_fifo < 0)
-      {
-        perror("Make named fifo error\n");
-        exit(EXIT_FAILURE);
-      }
 
-      errno = 0;
-      int fifo_fd = open(fifo, O_WRONLY | O_NONBLOCK);
-      if (fifo_fd < 0 && errno == EINTR)
-      {
-        printf("%d\n", errno);
+    errno = 0;
+    int fifo_fd = open(fifo, O_WRONLY | O_NONBLOCK);
+    if (fifo_fd < 0)
+    {
         perror("Named fifo can't be opened\n");
         exit(EXIT_FAILURE);
-      }
+    }
 
-      errno = 0;
-      int ret_fcntl = fcntl(fifo_fd, F_SETFL, ~O_NONBLOCK);//without '~'?
-      if (ret_fcntl < 0)
-      {
+    errno = 0;
+    int ret_fcntl = fcntl(fifo_fd, F_SETFL, O_WRONLY);//without '~'?
+    if (ret_fcntl < 0)
+    {
         perror("Change O_NONBLOCK flag error");
         exit(EXIT_FAILURE);
-      }
+    }
 
-
-      int ret_val = -1;
-      for(int i = 0; i < 5; i++)
-      {
-
-        ////////////////////////////////////////////////////////
-        sleep(5);
-        ////////////////////////////////////////////////////////
+    do
+    {
+        errno = 0;
+        ret_read = read(file_fd, buff, 4096 * sizeof(buff[0]));
+        if (ret_read < 0)
+        {
+            perror("Read from file error");
+            exit(EXIT_FAILURE);
+        }
 
         errno = 0;
-        ret_val = write(fifo_fd, &file_size, sizeof(file_size));
-        if (ret_val < 0)
+        ssize_t ret_write = write(fifo_fd, buff, ret_read * sizeof(buff[0]));
+        if (ret_write <= 0 && errno == EPIPE)
         {
-          if (errno == EPIPE)
-          {
-            close(fifo_fd);
-            continue;//TODO goto or while + continue
-          }
-          perror("Write to named pipe error(not connection)\n");
-          exit(EXIT_FAILURE);
+            perror("Died transfer fifo");
+            exit(EXIT_FAILURE);
         }
-      }
-
-      errno = 0;
-      ret_val = write(fifo_fd, buff, file_size);
-      if (ret_val < 0)
-      {
-        if (errno == EPIPE)
+        if (ret_write < 0)
         {
-          close(fifo_fd);
-          continue;
+            perror("Write to transfer fifo error");
+            exit(EXIT_FAILURE);
         }
-        perror("Write to named pipe error(not connection)\n");
-        exit(EXIT_FAILURE);
-      }
-
-      close(fifo_fd);
-      break;
-    }
+    } while(ret_read > 0);
 
     close(trans_fd);
 
@@ -149,51 +135,4 @@ char* fifo_name(int pid)
   strcat(pid_buff, ".p");
 
   return pid_buff;
-}
-
-ssize_t calcSize(const char* inFile)
-{
-    assert(inFile != nullptr);
-
-    struct stat fileInfo;
-    stat(inFile, &fileInfo);
-
-    return fileInfo.st_size;
-}
-
-
-char* read_file(const char* name, ssize_t* file_size)
-{
-  if (name == nullptr || file_size == nullptr)
-    return nullptr;
-
-  errno = 0;
-  int in_fd = open(name, O_RDONLY);
-  if (in_fd < 0)
-  {
-      perror("Read file error\n");
-      exit(EXIT_FAILURE);
-  }
-
-  *file_size = calcSize(name);
-
-  errno = 0;
-  char* buff = (char*) calloc(*file_size, sizeof(buff[0]));
-  if (buff == nullptr || errno != 0)
-  {
-      perror("Calloc for file buff error\n");
-      exit(EXIT_FAILURE);
-  }
-
-  errno = 0;
-  ssize_t ret_val = read(in_fd, buff, (*file_size) * sizeof(buff[0]));
-  if (ret_val < 0)
-  {
-      perror("Read from file error\n");
-      exit(EXIT_FAILURE);
-  }
-
-  close(in_fd);
-
-  return buff;
 }
