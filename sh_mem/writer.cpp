@@ -68,9 +68,13 @@ int main(int argc, char* argv[])
         exit(EXIT_FAILURE);
     }
 
-    struct sembuf sops[2] = {
+    struct sembuf sops[6] = {
         {start, 0, IPC_NOWAIT},
-        {start, 1, 0}
+        {start, 1, 0},
+        {mutex, 1, 0},
+        {alive_r, 1, 0},
+        {alive_w, 1, 0},
+        {die, 2, 0}
     };// SEM_UNDO
 
     errno = 0;
@@ -81,26 +85,6 @@ int main(int argc, char* argv[])
         exit(EXIT_FAILURE);
     }
 
-    if (ret >= 0)
-    {
-        printf("I'm inicializer\n");
-        fflush(0);
-
-        sembuf sops2[4] = {
-            {mutex, 1, 0},
-            {alive_r, 1, 0},
-            {alive_w, 1, 0},
-            {die, 2, 0}
-          };
-
-        errno = 0;
-        ret = semop(sem_id, sops2, 4);
-        if (ret < 0)
-        {
-            perror("Initialization sem error");
-            exit(EXIT_FAILURE);
-        }
-    }
 ////////////////////////////////////////////////////////////////////////////////
     sembuf sops3[5] = {
         {die, -2, IPC_NOWAIT},
