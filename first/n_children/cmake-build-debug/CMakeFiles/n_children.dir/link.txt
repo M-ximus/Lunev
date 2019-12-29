@@ -1,0 +1,1 @@
+/usr/bin/c++  -g   CMakeFiles/n_children.dir/main.cpp.o  -o n_children 

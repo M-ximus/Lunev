@@ -1,0 +1,18 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/max/CLionProjects/num_from_args/main.cpp
+stdio.h
+-
+stdlib.h
+-
+limits.h
+-
+errno.h
+-
+
