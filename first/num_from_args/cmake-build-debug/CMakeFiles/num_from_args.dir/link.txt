@@ -1,1 +1,0 @@
-/usr/bin/c++  -g   CMakeFiles/num_from_args.dir/main.cpp.o  -o num_from_args 

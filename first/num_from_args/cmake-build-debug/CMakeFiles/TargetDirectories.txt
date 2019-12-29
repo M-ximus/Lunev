@@ -1,3 +1,0 @@
-/home/max/CLionProjects/num_from_args/cmake-build-debug/CMakeFiles/rebuild_cache.dir
-/home/max/CLionProjects/num_from_args/cmake-build-debug/CMakeFiles/num_from_args.dir
-/home/max/CLionProjects/num_from_args/cmake-build-debug/CMakeFiles/edit_cache.dir
